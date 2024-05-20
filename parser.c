@@ -16,8 +16,7 @@ const uint8_t data[] = {
   27, 0, 5, 51, 46, 52, 46, 49, 36, 0, 8, 90, 86, 255, 125, 241, 210, 243, 21
 };
 
-uint16_t read_uint16_be(uint16_t value)
-{
+uint16_t read_uint16_be(uint16_t value) {
     return (((value & 0x00FF) << 8) |
             ((value & 0xFF00) >> 8));
 }
@@ -28,17 +27,26 @@ struct header {
     uint16_t length;
 };
 
+enum protocol {
+    v1 = 1,
+    v2 = 2
+};
+
 struct ubiquity {
     struct header head;
-    char *protocol;
+    enum protocol protocol;
 };
 
 static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
-    ubi->protocol = 'v1';
+    ubi->protocol = v1;
+
+    return true;
 }
 
 static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data) {
-    ubi->protocol = "v2";
+    ubi->protocol = v2;
+
+    return true;
 }
 
 
@@ -73,7 +81,6 @@ bool parse(struct ubiquity *ubi, uint8_t *d, size_t len) {
 }
 
 int main() {
-
     struct ubiquity parsed_data;
     
     bool parse_ok = parse(&parsed_data, (uint8_t *)data, sizeof(data));
