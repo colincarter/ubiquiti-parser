@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include "parser.h"
 
 const uint8_t data[] = {
   2, 6, 0, 155, 2, 0, 10, 252, 236, 218, 25, 99, 240, 192, 168, 1, 20, 1, 0, 6,
@@ -32,9 +33,15 @@ enum protocol {
     v2 = 2
 };
 
+struct mac_address {
+    unsigned char *mac_address;
+    struct mac_address *next;
+};
+
 struct ubiquity {
     struct header head;
     enum protocol protocol;
+    struct mac_addresses *mac_address;
 };
 
 static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
@@ -43,8 +50,59 @@ static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
     return true;
 }
 
-static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data) {
+struct tld {
+    uint8_t type;
+    uint16_t length;
+    void *data;
+};
+
+void *read_data(u_int16_t len, void *data) {
+    void *d = malloc(len+1);
+    if (d == NULL) 
+        return NULL;
+
+    memcpy(d, data, len);
+
+    return d;
+}
+
+void read_mac_address(uint8_t *data, unsigned char *mac_address) {
+    sscanf(mac_address, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &data[0], &data[0], &data[0], &data[0], &data[0], &data[0]);
+}
+
+static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, size_t len) {
+    uint8_t *d = data;
+    uint8_t *end = d + len;
+
     ubi->protocol = v2;
+
+    d += sizeof(struct header);
+
+    while (d < end) {
+        struct tld tld;
+
+        tld.type = *d++;
+        tld.length = read_uint16_be(*(uint16_t *)d);
+        d += sizeof(tld.length);
+        
+        printf("type=%d length=%d\n", tld.type, tld.length);
+
+        tld.data = read_data(tld.length, d);
+
+        switch (tld.type) {
+            case V2_IPINFO:
+                unsigned char mac_address[17+1];
+                unsigned char ip_address[6+1];
+                read_mac_address(tld.data, &mac_address);
+                read_ip_address(tld.data + 6, &ip_address);
+
+                break;
+        }
+
+        d += tld.length;
+
+        free(tld.data);
+    }
 
     return true;
 }
@@ -74,7 +132,7 @@ bool parse(struct ubiquity *ubi, uint8_t *d, size_t len) {
     if (version == 1 && cmd == 0) {
         return parse_v1_packet(ubi, d);
     } else if (version == 2) {
-        return parse_v2_packet(cmd, ubi, d);
+        return parse_v2_packet(cmd, ubi, d, len);
     }
 
     return false;
@@ -89,8 +147,4 @@ int main() {
         printf("Failed to parse\n");
         return 1;
     }
-
-    printf("cmd = %d\n", parsed_data.head.cmd);
-    printf("type = %d\n", parsed_data.head.version);
-    printf("length = %d\n", parsed_data.head.length);
 }
