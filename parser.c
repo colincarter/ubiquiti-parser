@@ -53,7 +53,7 @@ static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
 struct tld {
     uint8_t type;
     uint16_t length;
-    void *data;
+    uint8_t *data;
 };
 
 void *read_data(u_int16_t len, void *data) {
@@ -66,8 +66,44 @@ void *read_data(u_int16_t len, void *data) {
     return d;
 }
 
-void read_mac_address(uint8_t *data, unsigned char *mac_address) {
-    sscanf(mac_address, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &data[0], &data[0], &data[0], &data[0], &data[0], &data[0]);
+const char *hex_val = "0123456789ABCDEF";
+
+// Given a byte return the hex equivalent
+// 2 bytes result: 255 => FF
+void byte_to_hex(uint8_t byte, char *hex) {
+    char *out = hex;
+    out[0] = hex_val[(byte >> 4) & 0xf];
+    out[1] = hex_val[byte & 0xf];
+}
+
+void read_mac_address(uint8_t *data, char *mac_address) {
+    char *mac = mac_address;
+    for (int i = 0; i < 6; i++) {
+        byte_to_hex(data[i], mac);
+
+        mac += 2; // skip data just written
+
+        if (i != 5) {
+            *mac++ = ':';
+        }
+    }
+
+    *mac = '\0';  // 0 terminate string
+}
+
+char byte_to_char(uint8_t b) {
+    return (char)b ;
+}
+
+void read_ip_address(uint8_t *data, char *ip_address) {
+    // sprintf(ip_address, "%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
+    *ip_address++ = byte_to_char(data[0]);
+    *ip_address++ = '.';
+    *ip_address++ = byte_to_char(data[1]);
+    *ip_address++ = '.';
+    *ip_address++ = byte_to_char(data[2]);
+    *ip_address++ = '.';
+    *ip_address++ = byte_to_char(data[3]);
 }
 
 static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, size_t len) {
@@ -90,12 +126,15 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
         tld.data = read_data(tld.length, d);
 
         switch (tld.type) {
-            case V2_IPINFO:
-                unsigned char mac_address[17+1];
-                unsigned char ip_address[6+1];
-                read_mac_address(tld.data, &mac_address);
-                read_ip_address(tld.data + 6, &ip_address);
-
+            case V2_IPINFO: {
+                    // tld.data is 6 bytes
+                    char mac_address[17+1] = {0};
+                    char ip_address[12+4+1] = {0};
+                    read_mac_address(tld.data, mac_address);
+                    read_ip_address(tld.data + 6, ip_address);
+                    printf("mac_address=%s\n", mac_address);
+                    printf("ip address=%s\n", ip_address);
+                }
                 break;
         }
 
