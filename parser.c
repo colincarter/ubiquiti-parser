@@ -41,29 +41,57 @@ struct mac_address {
 struct ubiquity {
     struct header head;
     enum protocol protocol;
-    struct mac_addresses *mac_address;
+    char mac_addresses[10][17+1]; // Space for 10 mac addresses
+    char ip_addresses[10][12+4+1];
 };
+
+void add_mac_address(struct ubiquity *ubi, char *mac) {
+    // first check it doesn't exist
+    for (int i = 0; i < 10; i++) {
+        if (strcmp(ubi->mac_addresses[i], mac) == 0) {
+            printf("%s already exists\n", mac);
+            return;
+        }
+    }
+
+    int i = 0;
+
+    while (i < 10) {
+        if (ubi->mac_addresses[i][0] == 0)
+            break;
+        
+        i++;
+    }
+
+    strcpy(ubi->mac_addresses[i], mac);
+}
+
+void add_ip_address(struct ubiquity *ubi, char *ip) {
+    // first check it doesn't exist
+    for (int i = 0; i < 10; i++) {
+        if (strcmp(ubi->ip_addresses[i], ip) == 0) {
+            printf("%s already exists\n", ip);
+            return;
+        }
+    }
+
+    int i = 0;
+
+    while (i < 10) {
+        if (ubi->ip_addresses[i][0] == 0)
+            break;
+        
+        i++;
+    }
+
+    strcpy(ubi->ip_addresses[i], ip);
+}
+
 
 static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
     ubi->protocol = v1;
 
     return true;
-}
-
-struct tld {
-    uint8_t type;
-    uint16_t length;
-    uint8_t *data;
-};
-
-void *read_data(u_int16_t len, void *data) {
-    void *d = malloc(len+1);
-    if (d == NULL) 
-        return NULL;
-
-    memcpy(d, data, len);
-
-    return d;
 }
 
 const char *hex_val = "0123456789ABCDEF";
@@ -96,14 +124,7 @@ char byte_to_char(uint8_t b) {
 }
 
 void read_ip_address(uint8_t *data, char *ip_address) {
-    // sprintf(ip_address, "%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
-    *ip_address++ = byte_to_char(data[0]);
-    *ip_address++ = '.';
-    *ip_address++ = byte_to_char(data[1]);
-    *ip_address++ = '.';
-    *ip_address++ = byte_to_char(data[2]);
-    *ip_address++ = '.';
-    *ip_address++ = byte_to_char(data[3]);
+    sprintf(ip_address, "%d.%d.%d.%d", data[0], data[1], data[2], data[3]);
 }
 
 static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, size_t len) {
@@ -115,32 +136,32 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
     d += sizeof(struct header);
 
     while (d < end) {
-        struct tld tld;
+        uint8_t type = *d++;
+        uint16_t length = read_uint16_be(*(uint16_t *)d);
 
-        tld.type = *d++;
-        tld.length = read_uint16_be(*(uint16_t *)d);
-        d += sizeof(tld.length);
-        
-        printf("type=%d length=%d\n", tld.type, tld.length);
+        d += sizeof(uint16_t);
 
-        tld.data = read_data(tld.length, d);
+        uint8_t data[length + 1];
+        memcpy(data, d, length);
 
-        switch (tld.type) {
+        printf("type=%d length=%d\n", type, length);
+
+        switch (type) {
             case V2_IPINFO: {
                     // tld.data is 6 bytes
                     char mac_address[17+1] = {0};
                     char ip_address[12+4+1] = {0};
-                    read_mac_address(tld.data, mac_address);
-                    read_ip_address(tld.data + 6, ip_address);
-                    printf("mac_address=%s\n", mac_address);
-                    printf("ip address=%s\n", ip_address);
+                    memset(mac_address, 0, 17+1);
+                    memset(ip_address, 0, 12+4+1);
+                    read_mac_address(data, mac_address);
+                    read_ip_address(data + 6, ip_address);
+                    add_mac_address(ubi, mac_address);
+                    add_ip_address(ubi, ip_address);
                 }
                 break;
         }
 
-        d += tld.length;
-
-        free(tld.data);
+        d += length;
     }
 
     return true;
@@ -185,5 +206,14 @@ int main() {
     if (!parse_ok) {
         printf("Failed to parse\n");
         return 1;
+    }
+
+    for(int i = 0; i < 10; i++) {
+        if (parsed_data.mac_addresses[i][0] != 0 ) {
+            printf("%s\n", parsed_data.mac_addresses[i]);
+        }
+        if (parsed_data.ip_addresses[i][0] != 0) {
+            printf("%s\n", parsed_data.ip_addresses[i]);
+        }
     }
 }
