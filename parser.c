@@ -84,7 +84,9 @@ void add_ip_address(struct ubiquity *ubi, char *ip) {
         i++;
     }
 
-    strcpy(ubi->ip_addresses[i], ip);
+    if (i < 10) {
+        strcpy(ubi->ip_addresses[i], ip);
+    }
 }
 
 

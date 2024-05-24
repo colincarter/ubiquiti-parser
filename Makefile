@@ -8,8 +8,16 @@ OBJ=parser.o
 parser: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
 
-.PHONY: clean
+.PHONY: clean leak
 
 clean:
 	rm *.o
 	rm parser
+
+leak:
+	valgrind --leak-check=full \
+			 --show-leak-kinds=all \
+			 --track-origins=yes \
+			 --verbose \
+			 --log-file=valgrind-out.txt \
+			 ./parser
