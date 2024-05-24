@@ -6,6 +6,11 @@
 #include <stdbool.h>
 #include "parser.h"
 
+#define MAX_MAC_ADDRESSES   10
+#define MAX_IP_ADDRESSES    10
+#define MAC_ADDRESS_LENGTH  17+1
+#define IP_ADDRESS_LENGTH   16+1
+
 const uint8_t data[] = {
   2, 6, 0, 155, 2, 0, 10, 252, 236, 218, 25, 99, 240, 192, 168, 1, 20, 1, 0, 6,
   252, 236, 218, 25, 99, 240, 10, 0, 4, 0, 13, 248, 59, 11, 0, 4, 85, 66, 78,
@@ -41,13 +46,13 @@ struct mac_address {
 struct ubiquity {
     struct header head;
     enum protocol protocol;
-    char mac_addresses[10][17+1]; // Space for 10 mac addresses
-    char ip_addresses[10][12+4+1];
+    char mac_addresses[MAX_MAC_ADDRESSES][MAC_ADDRESS_LENGTH]; // Space for 10 mac addresses
+    char ip_addresses[MAX_IP_ADDRESSES][IP_ADDRESS_LENGTH];
 };
 
 void add_mac_address(struct ubiquity *ubi, char *mac) {
     // first check it doesn't exist
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < MAX_MAC_ADDRESSES; i++) {
         if (strcmp(ubi->mac_addresses[i], mac) == 0) {
             printf("%s already exists\n", mac);
             return;
@@ -56,19 +61,21 @@ void add_mac_address(struct ubiquity *ubi, char *mac) {
 
     int i = 0;
 
-    while (i < 10) {
+    while (i < MAX_MAC_ADDRESSES) {
         if (ubi->mac_addresses[i][0] == 0)
             break;
         
         i++;
     }
 
-    strcpy(ubi->mac_addresses[i], mac);
+    if (i < MAX_MAC_ADDRESSES) {
+        strcpy(ubi->mac_addresses[i], mac);
+    }
 }
 
 void add_ip_address(struct ubiquity *ubi, char *ip) {
     // first check it doesn't exist
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < MAX_IP_ADDRESSES; i++) {
         if (strcmp(ubi->ip_addresses[i], ip) == 0) {
             printf("%s already exists\n", ip);
             return;
@@ -77,14 +84,14 @@ void add_ip_address(struct ubiquity *ubi, char *ip) {
 
     int i = 0;
 
-    while (i < 10) {
+    while (i < MAX_IP_ADDRESSES) {
         if (ubi->ip_addresses[i][0] == 0)
             break;
         
         i++;
     }
 
-    if (i < 10) {
+    if (i < MAX_IP_ADDRESSES) {
         strcpy(ubi->ip_addresses[i], ip);
     }
 }
@@ -151,10 +158,8 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
         switch (type) {
             case V2_IPINFO: {
                     // tld.data is 6 bytes
-                    char mac_address[17+1] = {0};
-                    char ip_address[12+4+1] = {0};
-                    memset(mac_address, 0, 17+1);
-                    memset(ip_address, 0, 12+4+1);
+                    char mac_address[MAC_ADDRESS_LENGTH] = {0};
+                    char ip_address[IP_ADDRESS_LENGTH] = {0};
                     read_mac_address(data, mac_address);
                     read_ip_address(data + 6, ip_address);
                     add_mac_address(ubi, mac_address);
@@ -210,10 +215,13 @@ int main() {
         return 1;
     }
 
-    for(int i = 0; i < 10; i++) {
+    for(int i = 0; i < MAX_MAC_ADDRESSES; i++) {
         if (parsed_data.mac_addresses[i][0] != 0 ) {
             printf("%s\n", parsed_data.mac_addresses[i]);
         }
+    }
+    
+    for(int i = 0; i < MAX_IP_ADDRESSES; i++) {
         if (parsed_data.ip_addresses[i][0] != 0) {
             printf("%s\n", parsed_data.ip_addresses[i]);
         }
