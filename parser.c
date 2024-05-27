@@ -45,12 +45,16 @@ struct mac_address {
 
 struct ubiquity {
     struct header head;
-    enum protocol protocol;
-    char mac_addresses[MAX_MAC_ADDRESSES][MAC_ADDRESS_LENGTH]; // Space for 10 mac addresses
-    char ip_addresses[MAX_IP_ADDRESSES][IP_ADDRESS_LENGTH];
+    enum protocol protocol; // v1 or v2
+    struct mac_address *mac_addresses;
 };
 
 void add_mac_address(struct ubiquity *ubi, char *mac) {
+    if (ubi->mac_addresses == NULL) {
+        ubi->mac_addresses = malloc(sizeof(struct mac_address));
+    }
+
+
     // first check it doesn't exist
     for (int i = 0; i < MAX_MAC_ADDRESSES; i++) {
         if (strcmp(ubi->mac_addresses[i], mac) == 0) {
@@ -150,9 +154,6 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
 
         d += sizeof(uint16_t);
 
-        uint8_t data[length + 1];
-        memcpy(data, d, length);
-
         printf("type=%d length=%d\n", type, length);
 
         switch (type) {
@@ -160,8 +161,8 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
                     // tld.data is 6 bytes
                     char mac_address[MAC_ADDRESS_LENGTH] = {0};
                     char ip_address[IP_ADDRESS_LENGTH] = {0};
-                    read_mac_address(data, mac_address);
-                    read_ip_address(data + 6, ip_address);
+                    read_mac_address(d, mac_address);
+                    read_ip_address(d + 6, ip_address);
                     add_mac_address(ubi, mac_address);
                     add_ip_address(ubi, ip_address);
                 }
@@ -205,25 +206,54 @@ bool parse(struct ubiquity *ubi, uint8_t *d, size_t len) {
     return false;
 }
 
+struct ubiquity *new_parsed_data() {
+    return malloc(sizeof(struct ubiquity));
+}
+
+struct free_mac_addresses(struct mac_address *m) {
+    
+}
+
+void free_parsed_data(struct ubiquity *u) {
+    if (u == NULL) return;
+
+
+    free_mac_addresses(u->mac_addresses);
+
+    if (u->mac_addresses != NULL) {
+        free(u->mac_addresses);
+    }
+
+    free(u);
+}
+
 int main() {
-    struct ubiquity parsed_data;
+    struct ubiquity *parsed_data = new_parsed_data();
+    if (parsed_data == NULL) {
+        goto error_no_free;
+    }
     
-    bool parse_ok = parse(&parsed_data, (uint8_t *)data, sizeof(data));
-
+    bool parse_ok = parse(parsed_data, (uint8_t *)data, sizeof(data));
     if (!parse_ok) {
-        printf("Failed to parse\n");
-        return 1;
+        goto error;
     }
 
-    for(int i = 0; i < MAX_MAC_ADDRESSES; i++) {
-        if (parsed_data.mac_addresses[i][0] != 0 ) {
-            printf("%s\n", parsed_data.mac_addresses[i]);
-        }
-    }
+    // for(int i = 0; i < MAX_MAC_ADDRESSES; i++) {
+    //     if (parsed_data.mac_addresses[i][0] != 0 ) {
+    //         printf("%s\n", parsed_data.mac_addresses[i]);
+    //     }
+    // }
     
-    for(int i = 0; i < MAX_IP_ADDRESSES; i++) {
-        if (parsed_data.ip_addresses[i][0] != 0) {
-            printf("%s\n", parsed_data.ip_addresses[i]);
-        }
-    }
+    // for(int i = 0; i < MAX_IP_ADDRESSES; i++) {
+    //     if (parsed_data.ip_addresses[i][0] != 0) {
+    //         printf("%s\n", parsed_data.ip_addresses[i]);
+    //     }
+    // }
+
+    exit(0);
+
+error:
+    free_parsed_data();
+error_no_free:
+    exit(1);
 }
