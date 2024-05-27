@@ -38,65 +38,64 @@ enum protocol {
     v2 = 2
 };
 
-struct mac_address {
-    unsigned char *mac_address;
-    struct mac_address *next;
+struct ip_mac_address {
+    char *mac_address;
+    char *ip_address;
+    struct ip_mac_address *next;
 };
 
 struct ubiquity {
     struct header head;
     enum protocol protocol; // v1 or v2
-    struct mac_address *mac_addresses;
+    struct ip_mac_address *addresses;
 };
 
-void add_mac_address(struct ubiquity *ubi, char *mac) {
-    if (ubi->mac_addresses == NULL) {
-        ubi->mac_addresses = malloc(sizeof(struct mac_address));
-    }
-
-
-    // first check it doesn't exist
-    for (int i = 0; i < MAX_MAC_ADDRESSES; i++) {
-        if (strcmp(ubi->mac_addresses[i], mac) == 0) {
-            printf("%s already exists\n", mac);
+void add_address(struct ubiquity *ubi, const char *ip, const char *mac) {
+    if (ubi->addresses == NULL) {
+        struct ip_mac_address *new = malloc(sizeof(struct ip_mac_address));
+        if (new == NULL) {
             return;
         }
+
+        new->next = NULL;
+        new->ip_address = NULL;
+        new->mac_address = NULL;
+        ubi->addresses = new;
     }
 
-    int i = 0;
+    struct ip_mac_address *tail = ubi->addresses;
 
-    while (i < MAX_MAC_ADDRESSES) {
-        if (ubi->mac_addresses[i][0] == 0)
+    while (tail != NULL) {
+        if (tail->next == NULL) {
+            struct ip_mac_address *new = malloc(sizeof(struct ip_mac_address));
+            if (new == NULL) {
+                return;
+            }
+
+            new->next = NULL;
+
+            new->ip_address = malloc(IP_ADDRESS_LENGTH);
+            if (new->ip_address == NULL) {
+                free(new);
+                return;
+            }
+
+            new->mac_address = malloc(MAC_ADDRESS_LENGTH);
+            if (new->mac_address == NULL) {
+                free(new->ip_address);
+                free(new);
+                return;
+            }
+
+            strcpy(new->ip_address, ip);
+            strcpy(new->mac_address, mac);
+
+            tail->next = new;
+
             break;
-        
-        i++;
-    }
-
-    if (i < MAX_MAC_ADDRESSES) {
-        strcpy(ubi->mac_addresses[i], mac);
-    }
-}
-
-void add_ip_address(struct ubiquity *ubi, char *ip) {
-    // first check it doesn't exist
-    for (int i = 0; i < MAX_IP_ADDRESSES; i++) {
-        if (strcmp(ubi->ip_addresses[i], ip) == 0) {
-            printf("%s already exists\n", ip);
-            return;
         }
-    }
 
-    int i = 0;
-
-    while (i < MAX_IP_ADDRESSES) {
-        if (ubi->ip_addresses[i][0] == 0)
-            break;
-        
-        i++;
-    }
-
-    if (i < MAX_IP_ADDRESSES) {
-        strcpy(ubi->ip_addresses[i], ip);
+        tail = tail->next;
     }
 }
 
@@ -163,8 +162,7 @@ static bool parse_v2_packet(uint8_t cmd, struct ubiquity *ubi, uint8_t *data, si
                     char ip_address[IP_ADDRESS_LENGTH] = {0};
                     read_mac_address(d, mac_address);
                     read_ip_address(d + 6, ip_address);
-                    add_mac_address(ubi, mac_address);
-                    add_ip_address(ubi, ip_address);
+                    add_address(ubi, ip_address, mac_address);
                 }
                 break;
         }
@@ -207,21 +205,34 @@ bool parse(struct ubiquity *ubi, uint8_t *d, size_t len) {
 }
 
 struct ubiquity *new_parsed_data() {
-    return malloc(sizeof(struct ubiquity));
+    struct ubiquity *new = malloc(sizeof(struct ubiquity));
+    if (new != NULL) {
+        new->addresses = NULL;
+    }
+
+    return new;
 }
 
-struct free_mac_addresses(struct mac_address *m) {
-    
+void free_addresses(struct ip_mac_address *m) {
+    struct ip_mac_address *next = m;
+
+    while (next != NULL) {
+        free(next->ip_address);
+        free(next->mac_address);
+
+        next = next->next;
+
+        free(next->next);
+    }
 }
 
 void free_parsed_data(struct ubiquity *u) {
     if (u == NULL) return;
 
+    free_addresses(u->addresses);
 
-    free_mac_addresses(u->mac_addresses);
-
-    if (u->mac_addresses != NULL) {
-        free(u->mac_addresses);
+    if (u->addresses != NULL) {
+        free(u->addresses);
     }
 
     free(u);
@@ -244,16 +255,15 @@ int main() {
     //     }
     // }
     
-    // for(int i = 0; i < MAX_IP_ADDRESSES; i++) {
-    //     if (parsed_data.ip_addresses[i][0] != 0) {
-    //         printf("%s\n", parsed_data.ip_addresses[i]);
-    //     }
-    // }
+    for(struct ip_mac_address *m = parsed_data->addresses; m->next != NULL; m = m->next) {
+        printf("ip address=%s\n", m->ip_address);
+        printf("mac address=%s\n", m->mac_address);
+    }
 
     exit(0);
 
 error:
-    free_parsed_data();
+    free_parsed_data(parsed_data);
 error_no_free:
     exit(1);
 }
