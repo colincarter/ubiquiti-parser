@@ -235,26 +235,24 @@ void free_parsed_data(struct ubiquity *u) {
 }
 
 int main() {
+    int retcode = 0;
+    
     struct ubiquity *parsed_data = new_parsed_data();
     if (parsed_data == NULL) {
-        goto error_no_free;
+        retcode = 1;
+        goto error;
     }
     
     bool parse_ok = parse(parsed_data, (uint8_t *)data, sizeof(data));
     if (!parse_ok) {
+        retcode = 1;
         goto error;
     }
-
-    // for(int i = 0; i < MAX_MAC_ADDRESSES; i++) {
-    //     if (parsed_data.mac_addresses[i][0] != 0 ) {
-    //         printf("%s\n", parsed_data.mac_addresses[i]);
-    //     }
-    // }
 
     print_addresses(parsed_data);
 
 error:
     free_parsed_data(parsed_data);
-error_no_free:
-    exit(1);
+
+    exit(retcode);
 }
