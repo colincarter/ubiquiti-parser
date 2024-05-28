@@ -85,6 +85,17 @@ void add_address(struct ubiquity *ubi, const char *ip, const char *mac) {
 }
 
 
+void print_addresses(struct ubiquity *ubi) {
+    struct ip_mac_address *current = ubi->addresses;
+
+    while (current != NULL) {
+        printf("%p->", current);
+        current = current->next;
+    }
+
+    printf("\n");
+}
+
 static bool parse_v1_packet(struct ubiquity *ubi, uint8_t *data) {
     ubi->protocol = v1;
 
@@ -202,17 +213,17 @@ struct ubiquity *new_parsed_data() {
 void free_addresses(struct ubiquity *ubi) {
     if (ubi->addresses == NULL) return;
 
-    struct ip_mac_address *m = ubi->addresses;
+    struct ip_mac_address *head = ubi->addresses;
 
-    while (m != NULL) {
-        free(m->ip_address);
-        free(m->mac_address);
+    while (head != NULL) {
+        struct ip_mac_address *new_head = head->next;
 
-        m = m->next;
+        free(head->ip_address);
+        free(head->mac_address);
+        free(head);
 
-        free(m);
+        head = new_head;
     }
-
 }
 
 void free_parsed_data(struct ubiquity *u) {
@@ -239,13 +250,8 @@ int main() {
     //         printf("%s\n", parsed_data.mac_addresses[i]);
     //     }
     // }
-    
-    for(struct ip_mac_address *m = parsed_data->addresses; m != NULL; m = m->next) {
-        printf("ip address=%s\n", m->ip_address);
-        printf("mac address=%s\n", m->mac_address);
-    }
 
-    exit(0);
+    print_addresses(parsed_data);
 
 error:
     free_parsed_data(parsed_data);
