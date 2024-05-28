@@ -51,50 +51,37 @@ struct ubiquity {
 };
 
 void add_address(struct ubiquity *ubi, const char *ip, const char *mac) {
-    struct ip_mac_address *new;
+    struct ip_mac_address *new = malloc(sizeof(struct ip_mac_address));
+    if (new == NULL) {
+        return;
+    }
+
+    char *new_ip_address = malloc(IP_ADDRESS_LENGTH);
+    if (new_ip_address == NULL) {
+        free(new);
+        return;
+    }
+
+    char *new_mac_address = malloc(MAC_ADDRESS_LENGTH);
+    if (new_mac_address == NULL) {
+        free(new_ip_address);
+        free(new);
+        return;
+    }
+
+    strcpy(new_ip_address, ip);
+    strcpy(new_mac_address, mac);
+
+    new->ip_address = new_ip_address;
+    new->mac_address = new_mac_address;
 
     if (ubi->addresses == NULL) {
-        new = malloc(sizeof(struct ip_mac_address));
-        if (new == NULL) {
-            return;
-        }
-
-        new->ip_address = NULL;
-        new->mac_address = NULL;
         new->next = NULL;
-
-        ubi->addresses = new;
+    } else {
+        new->next = ubi->addresses;
     }
 
-    // Find the last one
-    struct ip_mac_address *m = ubi->addresses;
-
-    while (m->next != NULL) {
-        m = m->next;
-    }
-
-    new = malloc(sizeof(struct ip_mac_address));
-    if (new != NULL) {
-        return;
-    }
-
-    new->ip_address = malloc(IP_ADDRESS_LENGTH);
-    if (new->ip_address == NULL) {
-        free(new);
-        return;
-    }
-
-    new->mac_address = malloc(MAC_ADDRESS_LENGTH);
-    if (new->mac_address == NULL) {
-        free(new->ip_address);
-        free(new);
-        return;
-    }
-
-    strcpy(new->ip_address, ip);
-    strcpy(new->mac_address, mac);
-
-    m->next = new;
+    ubi->addresses = new;
 }
 
 
